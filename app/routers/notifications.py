@@ -15,11 +15,21 @@ async def setup_notifications(settings: NotificationSettings):
             'before_minutes': settings.before_minutes,
             'calendars': settings.calendars,
             'enabled': settings.enabled,
-            'created_at': datetime.utcnow().isoformat(),
             'updated_at': datetime.utcnow().isoformat()
         }
 
-        supabase.table('notification_settings').upsert(notification_data).execute()
+        # Eerst proberen te updaten
+        result = supabase.table('notification_settings')\
+            .update(notification_data)\
+            .eq('email', settings.email)\
+            .execute()
+
+        # Als er geen bestaande record is, maak een nieuwe aan
+        if not result.data:
+            notification_data['created_at'] = datetime.utcnow().isoformat()
+            result = supabase.table('notification_settings')\
+                .insert(notification_data)\
+                .execute()
 
         return {
             "message": "Notification settings saved",
