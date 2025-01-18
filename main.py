@@ -109,3 +109,24 @@ async def save_event_to_supabase(event):
     except Exception as e:
         print(f"Fout bij opslaan event: {e}")
         return None
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {"status": "ok", "message": "API is running"}
+
+@app.get("/api/health")
+async def health():
+    """Detailed health check"""
+    try:
+        # Test Supabase connection
+        supabase_ok = bool(supabase.table('calendar_events').select("*").limit(1).execute())
+        
+        return {
+            "status": "ok",
+            "supabase": "connected" if supabase_ok else "error",
+            "google_credentials": "configured" if CREDENTIALS_FILE else "missing"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return {"status": "error", "message": str(e)}

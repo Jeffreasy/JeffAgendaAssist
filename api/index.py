@@ -2,12 +2,21 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 import sys
 import os
+import logging
 
-# Voeg de root directory toe aan sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Importeer de app van main.py
-from main import app
-
-# Dit is nodig voor Vercel
-handler = app 
+try:
+    # Voeg de root directory toe aan sys.path
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    
+    # Importeer de app van main.py
+    from main import app
+    
+    # Dit is nodig voor Vercel
+    handler = app
+except Exception as e:
+    logger.error(f"Error in index.py: {str(e)}")
+    raise e 
