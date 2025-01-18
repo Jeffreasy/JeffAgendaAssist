@@ -24,7 +24,7 @@ supabase: Client = create_client(
 )
 
 # Google Calendar setup
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+SCOPES = ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/calendar.events.readonly']
 CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS')
 if CREDENTIALS_FILE:
     # Als we in Vercel draaien, gebruik de environment variable
@@ -65,22 +65,39 @@ async def sync_calendar(credentials):
     """Sync calendar events to Supabase"""
     service = build('calendar', 'v3', credentials=credentials)
     
+    # Eerst halen we alle agenda's op
+    calendar_list = service.calendarList().list().execute()
+    
     now = datetime.datetime.utcnow()
     end_date = now + datetime.timedelta(days=30)
     
-    events_result = service.events().list(
-        calendarId='primary',
-        timeMin=now.isoformat() + 'Z',
-        timeMax=end_date.isoformat() + 'Z',
-        maxResults=100,
-        singleEvents=True,
-        orderBy='startTime'
-    ).execute()
-    
-    events = events_result.get('items', [])
-    
-    for event in events:
-        await save_event_to_supabase(event)
+    # Loop door alle agenda's
+    for calendar_item in calendar_list['items']:
+        calendar_id = calendar_item['id']
+        calendar_name = calendar_item['summary']
+        
+        logger.info(f"Syncing calendar: {calendar_name}")
+        
+        try:
+            events_result = service.events().list(
+                calendarId=calendar_id,
+                timeMin=now.isoformat() + 'Z',
+                timeMax=end_date.isoformat() + 'Z',
+                maxResults=100,
+                singleEvents=True,
+                orderBy='startTime'
+            ).execute()
+            
+            events = events_result.get('items', [])
+            
+            for event in events:
+                # Voeg calendar_name toe aan event data
+                event['calendar_name'] = calendar_name
+                await save_event_to_supabase(event)
+                
+        except Exception as e:
+            logger.error(f"Error syncing calendar {calendar_name}: {str(e)}")
+            continue
 
 async def save_event_to_supabase(event):
     """Save event to Supabase"""
@@ -93,6 +110,7 @@ async def save_event_to_supabase(event):
         'location': event.get('location', ''),
         'status': event.get('status', 'confirmed'),
         'calendar_id': event.get('organizer', {}).get('email', 'primary'),
+        'calendar_name': event.get('calendar_name', 'Primary'),  # Nieuwe veld
         'recurring_event_id': event.get('recurringEventId', None),
         'is_recurring': bool(event.get('recurringEventId')),
         'attendees': event.get('attendees', []),
@@ -104,10 +122,10 @@ async def save_event_to_supabase(event):
     
     try:
         result = supabase.table('calendar_events').upsert(event_data).execute()
-        print(f"Event opgeslagen: {event_data['summary']}")
+        logger.info(f"Event opgeslagen: {event_data['summary']} ({event_data['calendar_name']})")
         return result
     except Exception as e:
-        print(f"Fout bij opslaan event: {e}")
+        logger.error(f"Fout bij opslaan event: {e}")
         return None
 
 @app.get("/")
