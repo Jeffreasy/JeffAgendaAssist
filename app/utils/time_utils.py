@@ -21,9 +21,8 @@ def convert_time(time_dict):
     else:
         dt = datetime.datetime.fromisoformat(time_str)
 
-    # Converteer naar Amsterdam-tijd en voeg expliciet 1 uur toe
+    # Converteer naar Amsterdam-tijd
     amsterdam_tz = ZoneInfo("Europe/Amsterdam")
-    local_dt = dt.astimezone(amsterdam_tz) + timedelta(hours=1)
+    local_dt = dt.astimezone(amsterdam_tz)  # Verwijder +1 uur
 
-    # Formatteer met expliciete timezone offset (wintertijd hardcoded)
-    return local_dt.strftime('%Y-%m-%d %H:%M:%S+0100')
+    return local_dt.strftime('%Y-%m-%d %H:%M:%S%z')
