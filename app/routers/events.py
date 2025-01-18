@@ -187,8 +187,8 @@ async def update_event_labels(
 
 @router.get("/filter")
 async def filter_events(
-    category: Optional[EventCategory] = None,
-    labels: Optional[List[EventLabel]] = None,
+    category: Optional[str] = None,
+    labels: Optional[List[str]] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
 ):
@@ -196,10 +196,12 @@ async def filter_events(
     try:
         query = supabase.table('calendar_events').select('*')
 
-        if category:
+        if category and category in ["vroeg", "laat", "weekend"]:
             query = query.eq('category', category)
         if labels:
-            query = query.contains('labels', labels)
+            valid_labels = [l for l in labels if l in ["werk", "prive", "belangrijk"]]
+            if valid_labels:
+                query = query.contains('labels', valid_labels)
         if start_date:
             query = query.gte('start_time', start_date)
         if end_date:

@@ -12,14 +12,14 @@ def determine_category(event_data):
     
     # Weekend check
     if start_time.weekday() >= 5:  # 5=Zaterdag, 6=Zondag
-        return 'weekend'
+        return "weekend"
     
     # Tijd check
     hour = start_time.hour
     if 6 <= hour < 14:
-        return 'vroeg'
+        return "vroeg"
     elif 14 <= hour < 23:
-        return 'laat'
+        return "laat"
     
     return None
 
