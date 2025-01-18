@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.config import supabase, logger
-from app.schemas import Event, EventUpdate, SearchResult
+from app.schemas import Event, EventUpdate, SearchResult, EventCategory, EventLabel, UpdateLabelsRequest, EventWithLabels
 
 router = APIRouter()
 
@@ -158,4 +158,56 @@ async def search_events(
         )
     except Exception as e:
         logger.error(f"Error searching events: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{event_id}/labels")
+async def update_event_labels(
+    event_id: str, 
+    update: UpdateLabelsRequest
+):
+    """Update category en labels van een event"""
+    try:
+        # Update data voorbereiden
+        update_data = {}
+        if update.category is not None:
+            update_data['category'] = update.category
+        if update.labels is not None:
+            update_data['labels'] = update.labels
+
+        result = supabase.table('calendar_events')\
+            .update(update_data)\
+            .eq('google_event_id', event_id)\
+            .execute()
+
+        return result.data[0] if result.data else None
+
+    except Exception as e:
+        logger.error(f"Error updating event labels: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/filter")
+async def filter_events(
+    category: Optional[EventCategory] = None,
+    labels: Optional[List[EventLabel]] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """Filter events op category en labels"""
+    try:
+        query = supabase.table('calendar_events').select('*')
+
+        if category:
+            query = query.eq('category', category)
+        if labels:
+            query = query.contains('labels', labels)
+        if start_date:
+            query = query.gte('start_time', start_date)
+        if end_date:
+            query = query.lte('end_time', end_date)
+
+        result = query.execute()
+        return [EventWithLabels(**event) for event in result.data]
+
+    except Exception as e:
+        logger.error(f"Error filtering events: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

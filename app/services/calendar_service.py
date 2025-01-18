@@ -6,6 +6,23 @@ from googleapiclient.discovery import build
 from app.config import supabase, logger
 from app.utils.time_utils import convert_time
 
+def determine_category(event_data):
+    """Bepaal category based op tijd en dag"""
+    start_time = datetime.fromisoformat(event_data['start_time'])
+    
+    # Weekend check
+    if start_time.weekday() >= 5:  # 5=Zaterdag, 6=Zondag
+        return 'weekend'
+    
+    # Tijd check
+    hour = start_time.hour
+    if 6 <= hour < 14:
+        return 'vroeg'
+    elif 14 <= hour < 23:
+        return 'laat'
+    
+    return None
+
 async def save_event_to_supabase(event):
     """Save event to Supabase"""
     event_data = {
@@ -24,7 +41,9 @@ async def save_event_to_supabase(event):
         'conference_data': event.get('conferenceData', {}),
         'color_id': event.get('colorId'),
         'visibility': event.get('visibility', 'default'),
-        'updated_at': datetime.datetime.utcnow().isoformat()
+        'updated_at': datetime.datetime.utcnow().isoformat(),
+        'category': determine_category(event_data),
+        'labels': []  # Default empty labels
     }
 
     try:
