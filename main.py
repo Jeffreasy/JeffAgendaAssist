@@ -8,6 +8,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 import logging
+from datetime import timezone, timedelta
+from zoneinfo import ZoneInfo  # Voor tijdzone ondersteuning
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -68,7 +70,9 @@ async def sync_calendar(credentials):
     # Eerst halen we alle agenda's op
     calendar_list = service.calendarList().list().execute()
     
-    now = datetime.datetime.utcnow()
+    # Gebruik Amsterdam tijdzone
+    amsterdam_tz = ZoneInfo("Europe/Amsterdam")
+    now = datetime.datetime.now(amsterdam_tz)
     end_date = now + datetime.timedelta(days=30)
     
     # Loop door alle agenda's
@@ -81,8 +85,8 @@ async def sync_calendar(credentials):
         try:
             events_result = service.events().list(
                 calendarId=calendar_id,
-                timeMin=now.isoformat() + 'Z',
-                timeMax=end_date.isoformat() + 'Z',
+                timeMin=now.isoformat(),  # Tijdzone zit nu in de timestamp
+                timeMax=end_date.isoformat(),
                 maxResults=100,
                 singleEvents=True,
                 orderBy='startTime'
@@ -91,7 +95,6 @@ async def sync_calendar(credentials):
             events = events_result.get('items', [])
             
             for event in events:
-                # Voeg calendar_name toe aan event data
                 event['calendar_name'] = calendar_name
                 await save_event_to_supabase(event)
                 
@@ -101,12 +104,26 @@ async def sync_calendar(credentials):
 
 async def save_event_to_supabase(event):
     """Save event to Supabase"""
+    # Converteer tijden naar Amsterdam tijdzone
+    amsterdam_tz = ZoneInfo("Europe/Amsterdam")
+    
+    # Helper functie voor tijd conversie
+    def convert_time(time_str):
+        if not time_str:
+            return time_str
+        # Als het een datetime is (met 'T' en 'Z')
+        if 'T' in time_str:
+            dt = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+            amsterdam_time = dt.astimezone(amsterdam_tz)
+            return amsterdam_time.isoformat()
+        return time_str  # Als het een datum is (zonder tijd)
+
     event_data = {
         'google_event_id': event['id'],
         'summary': event.get('summary', 'Geen titel'),
         'description': event.get('description', ''),
-        'start_time': event['start'].get('dateTime', event['start'].get('date')),
-        'end_time': event['end'].get('dateTime', event['end'].get('date')),
+        'start_time': convert_time(event['start'].get('dateTime', event['start'].get('date'))),
+        'end_time': convert_time(event['end'].get('dateTime', event['end'].get('date'))),
         'location': event.get('location', ''),
         'status': event.get('status', 'confirmed'),
         'calendar_id': event.get('organizer', {}).get('email', 'primary'),
