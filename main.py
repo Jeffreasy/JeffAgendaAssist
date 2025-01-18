@@ -124,12 +124,12 @@ async def save_event_to_supabase(event):
         else:
             dt = datetime.datetime.fromisoformat(time_str)
             
-        # Converteer naar Amsterdam tijd
+        # Converteer naar Amsterdam tijd en voeg expliciet 1 uur toe
         amsterdam_tz = ZoneInfo("Europe/Amsterdam")
-        local_dt = dt.astimezone(amsterdam_tz)
+        local_dt = dt.astimezone(amsterdam_tz) + timedelta(hours=1)
         
         # Formatteer met expliciete timezone offset
-        return local_dt.strftime('%Y-%m-%d %H:%M:%S%z')
+        return local_dt.strftime('%Y-%m-%d %H:%M:%S+0100')  # Hardcoded +0100 voor NL wintertijd
 
     event_data = {
         'google_event_id': event['id'],
