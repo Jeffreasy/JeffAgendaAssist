@@ -8,7 +8,20 @@ from app.utils.time_utils import convert_time
 
 def determine_category(event_data):
     """Bepaal category based op tijd en dag"""
-    start_time = datetime.fromisoformat(event_data['start_time'])
+    # Parse de tijd met timezone
+    start_time_str = event_data['start_time']
+    if '+' in start_time_str:
+        # Als er een timezone offset is
+        start_time = datetime.datetime.strptime(
+            start_time_str, 
+            '%Y-%m-%d %H:%M:%S%z'
+        )
+    else:
+        # Als er geen timezone is
+        start_time = datetime.datetime.strptime(
+            start_time_str, 
+            '%Y-%m-%d %H:%M:%S'
+        ).replace(tzinfo=ZoneInfo("Europe/Amsterdam"))
     
     # Weekend check
     if start_time.weekday() >= 5:  # 5=Zaterdag, 6=Zondag
