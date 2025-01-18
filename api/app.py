@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Importeer de app van main.py
-from main import app
+from app.main import app
 
 # Dit is nodig voor Vercel
 app = app 
