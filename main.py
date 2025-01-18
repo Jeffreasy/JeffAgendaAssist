@@ -113,8 +113,15 @@ async def save_event_to_supabase(event):
             return time_str
         # Als het een datetime is (met 'T' en 'Z')
         if 'T' in time_str:
-            dt = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
-            amsterdam_time = dt.astimezone(amsterdam_tz)
+            if time_str.endswith('Z'):
+                # Als de tijd in UTC (Z) is
+                dt = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+            else:
+                # Als de tijd al een timezone heeft
+                dt = datetime.datetime.fromisoformat(time_str)
+            
+            # Converteer naar Amsterdam tijd en voeg 1 uur toe voor correctie
+            amsterdam_time = dt.astimezone(amsterdam_tz) + timedelta(hours=1)
             return amsterdam_time.isoformat()
         return time_str  # Als het een datum is (zonder tijd)
 
