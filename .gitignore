@@ -2,4 +2,5 @@ venv/
 __pycache__/
 *.pyc
 token.json
-.env 
+.env
+client_secret_*.json 

@@ -7,6 +7,10 @@ from fastapi.responses import RedirectResponse
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -21,14 +25,23 @@ supabase: Client = create_client(
 
 # Google Calendar setup
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
-CREDENTIALS_FILE = 'client_secret_1030699582107-krrjnsu8i5vutkoukb8c5kiou1etmurg.apps.googleusercontent.com.json'
-
-# Create the flow outside of the request handler
-flow = Flow.from_client_secrets_file(
-    CREDENTIALS_FILE,
-    scopes=SCOPES,
-    redirect_uri='https://n8-n-chatter.vercel.app/api/auth/callback'
-)
+CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS')
+if CREDENTIALS_FILE:
+    # Als we in Vercel draaien, gebruik de environment variable
+    import json
+    credentials_dict = json.loads(CREDENTIALS_FILE)
+    flow = Flow.from_client_config(
+        credentials_dict,
+        scopes=SCOPES,
+        redirect_uri='https://jeff-agenda-assist.vercel.app/api/auth/callback'
+    )
+else:
+    # Lokaal development, gebruik het bestand
+    flow = Flow.from_client_secrets_file(
+        'client_secret_1030699582107-krrjnsu8i5vutkoukb8c5kiou1etmurg.apps.googleusercontent.com.json',
+        scopes=SCOPES,
+        redirect_uri='https://jeff-agenda-assist.vercel.app/api/auth/callback'
+    )
 
 @app.get("/api/auth/login")
 async def login():
@@ -39,14 +52,14 @@ async def login():
 @app.get("/api/auth/callback")
 async def callback(request: Request):
     """Handle the OAuth callback"""
-    flow.fetch_token(authorization_response=str(request.url))
-    credentials = flow.credentials
-    
-    # Store credentials in Supabase or environment
-    # Then sync calendar
-    await sync_calendar(credentials)
-    
-    return {"message": "Calendar synchronized successfully"}
+    try:
+        flow.fetch_token(authorization_response=str(request.url))
+        credentials = flow.credentials
+        await sync_calendar(credentials)
+        return {"message": "Calendar synchronized successfully"}
+    except Exception as e:
+        logger.error(f"Error in callback: {str(e)}")
+        return {"error": str(e)}, 500
 
 async def sync_calendar(credentials):
     """Sync calendar events to Supabase"""
