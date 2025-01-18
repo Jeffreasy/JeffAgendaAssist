@@ -2,7 +2,7 @@ import os
 import datetime
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -10,6 +10,8 @@ from googleapiclient.discovery import build
 import logging
 from datetime import timezone, timedelta
 from zoneinfo import ZoneInfo  # Voor tijdzone ondersteuning
+from typing import Optional, List
+from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,6 +46,16 @@ else:
         scopes=SCOPES,
         redirect_uri='https://jeff-agenda-assist.vercel.app/api/auth/callback'
     )
+
+# Event model voor de response
+class Event(BaseModel):
+    summary: str
+    description: Optional[str] = None
+    start_time: str
+    end_time: str
+    location: Optional[str] = None
+    calendar_name: str
+    is_recurring: bool = False
 
 @app.get("/api/auth/login")
 async def login():
@@ -178,3 +190,64 @@ async def health():
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return {"status": "error", "message": str(e)}
+
+@app.get("/api/events", response_model=List[Event])
+async def get_events(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    calendar_name: Optional[str] = None
+):
+    """Haal events op uit Supabase met optionele filters"""
+    try:
+        # Start met een basis query
+        query = supabase.table('calendar_events').select('*')
+        
+        # Voeg filters toe als ze zijn opgegeven
+        if start_date:
+            query = query.gte('start_time', start_date)
+        if end_date:
+            query = query.lte('end_time', end_date)
+        if calendar_name:
+            query = query.eq('calendar_name', calendar_name)
+            
+        # Sorteer op start tijd
+        query = query.order('start_time', desc=False)
+        
+        # Voer de query uit
+        result = query.execute()
+        
+        # Converteer de ruwe data naar Event objecten
+        events = []
+        for event in result.data:
+            events.append(Event(
+                summary=event['summary'],
+                description=event.get('description', ''),
+                start_time=event['start_time'],
+                end_time=event['end_time'],
+                location=event.get('location', ''),
+                calendar_name=event['calendar_name'],
+                is_recurring=event['is_recurring']
+            ))
+            
+        return events
+        
+    except Exception as e:
+        logger.error(f"Error fetching events: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Optioneel: endpoint voor beschikbare agenda's
+@app.get("/api/calendars")
+async def get_calendars():
+    """Haal lijst van unieke agenda namen op"""
+    try:
+        result = supabase.table('calendar_events')\
+            .select('calendar_name')\
+            .execute()
+        
+        # Haal unieke calendar names op
+        calendars = list(set(event['calendar_name'] for event in result.data))
+        return {"calendars": calendars}
+        
+    except Exception as e:
+        logger.error(f"Error fetching calendars: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
