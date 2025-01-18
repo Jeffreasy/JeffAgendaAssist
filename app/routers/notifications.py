@@ -10,12 +10,14 @@ router = APIRouter()
 async def setup_notifications(settings: NotificationSettings):
     """Setup email notificaties voor events"""
     try:
+        now = datetime.utcnow()
         notification_data = {
             'email': settings.email,
             'before_minutes': settings.before_minutes,
             'calendars': settings.calendars,
             'enabled': settings.enabled,
-            'updated_at': datetime.utcnow().isoformat()
+            'created_at': now.isoformat(),
+            'updated_at': now.isoformat()
         }
 
         # Eerst proberen te updaten
@@ -26,7 +28,6 @@ async def setup_notifications(settings: NotificationSettings):
 
         # Als er geen bestaande record is, maak een nieuwe aan
         if not result.data:
-            notification_data['created_at'] = datetime.utcnow().isoformat()
             result = supabase.table('notification_settings')\
                 .insert(notification_data)\
                 .execute()
