@@ -1,0 +1,99 @@
+# Jeff Agenda Assistant API Documentation
+
+## Overview
+RESTful API voor het beheren van Google Calendar events met Supabase database integratie.
+
+## Base URL
+https://jeff-agenda-assist.vercel.app
+
+## Endpoints
+
+### 1. Health Check Endpoints
+GET /                   # Basis health check
+GET /api/health        # Uitgebreide health check met Supabase en Google status
+
+### 2. Authenticatie Endpoints
+GET /api/auth/login     # Start Google OAuth flow
+GET /api/auth/callback  # Handelt OAuth callback af en sync agenda
+
+### 3. Event Management Endpoints
+# Ophalen van events
+GET /api/events                    # Alle events ophalen
+GET /api/events?start_date=2024-01-20&end_date=2024-02-20  # Events binnen datumbereik
+GET /api/events?calendar_name=SDB%20Planning  # Events van specifieke agenda
+
+# Event management
+GET /api/events/today             # Events van vandaag
+GET /api/events/upcoming?days=7   # Events voor komende X dagen
+DELETE /api/events/{event_id}     # Event verwijderen
+PUT /api/events/{event_id}        # Event updaten
+
+### 4. Calendar Management Endpoints
+GET /api/calendars     # Lijst van alle beschikbare agenda's
+
+### 5. Statistics Endpoints
+GET /api/stats         # Statistieken over events en agenda's
+
+### 6. Search Endpoints
+GET /api/events/search?query=string&calendar_name=optional  # Zoek in events
+
+### 7. Notification Endpoints
+POST /api/notifications/setup    # Setup email notificaties
+GET /api/notifications/settings?email=user@example.com  # Haal notificatie instellingen op
+
+## Request & Response Models
+
+### Event Response Model
+{
+    "summary": "string",
+    "description": "string | null",
+    "start_time": "string (ISO datetime)",
+    "end_time": "string (ISO datetime)",
+    "location": "string | null",
+    "calendar_name": "string",
+    "is_recurring": "boolean"
+}
+
+### Event Update Request Model
+{
+    "summary": "string | null",
+    "description": "string | null",
+    "start_time": "string | null",
+    "end_time": "string | null",
+    "location": "string | null"
+}
+
+## Voorbeelden
+
+### 1. Events ophalen
+curl https://jeff-agenda-assist.vercel.app/api/events
+
+### 2. Events filteren op datum
+curl "https://jeff-agenda-assist.vercel.app/api/events?start_date=2024-01-20&end_date=2024-02-20"
+
+### 3. Event updaten
+curl -X PUT https://jeff-agenda-assist.vercel.app/api/events/[event_id] \
+  -H "Content-Type: application/json" \
+  -d '{
+    "summary": "Nieuwe titel",
+    "location": "Nieuwe locatie"
+  }'
+
+### 4. Agenda's ophalen
+curl https://jeff-agenda-assist.vercel.app/api/calendars
+
+Response:
+{
+    "calendars": [
+        "SDB Planning",
+        "Feestdagen in Nederland",
+        "Projecten/Prive agenda"
+    ]
+}
+
+## Error Responses
+Alle endpoints retourneren een 500 status code bij fouten met een detail message:
+
+{
+    "detail": "Error message beschrijving"
+}

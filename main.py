@@ -57,6 +57,31 @@ class Event(BaseModel):
     calendar_name: str
     is_recurring: bool = False
 
+class EventUpdate(BaseModel):
+    summary: Optional[str] = None
+    description: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    location: Optional[str] = None
+
+# Nieuwe models toevoegen bovenaan bij de andere models
+class SearchResult(BaseModel):
+    events: List[Event]
+    total_count: int
+    query: str
+
+class CalendarStats(BaseModel):
+    total_events: int
+    events_per_calendar: dict
+    busy_days: List[str]
+    common_locations: List[str]
+
+class NotificationSettings(BaseModel):
+    email: str
+    before_minutes: int = 30
+    calendars: List[str] = []
+    enabled: bool = True
+
 @app.get("/api/auth/login")
 async def login():
     """Start the OAuth flow"""
@@ -250,4 +275,209 @@ async def get_calendars():
         
     except Exception as e:
         logger.error(f"Error fetching calendars: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Nieuwe endpoints voor event management
+@app.delete("/api/events/{event_id}")
+async def delete_event(event_id: str):
+    """Verwijder een event uit Supabase"""
+    try:
+        result = supabase.table('calendar_events')\
+            .delete()\
+            .eq('google_event_id', event_id)\
+            .execute()
+        return {"message": f"Event {event_id} verwijderd"}
+    except Exception as e:
+        logger.error(f"Error deleting event: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/events/{event_id}")
+async def update_event(event_id: str, event: EventUpdate):
+    """Update een event in Supabase"""
+    try:
+        # Haal alleen de gevulde velden uit het update object
+        update_data = {k: v for k, v in event.dict().items() if v is not None}
+        update_data['updated_at'] = datetime.utcnow().isoformat()
+        
+        result = supabase.table('calendar_events')\
+            .update(update_data)\
+            .eq('google_event_id', event_id)\
+            .execute()
+        return result.data[0] if result.data else None
+    except Exception as e:
+        logger.error(f"Error updating event: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/events/today")
+async def get_today_events():
+    """Haal events van vandaag op"""
+    try:
+        amsterdam_tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime.datetime.now(amsterdam_tz)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        result = supabase.table('calendar_events')\
+            .select('*')\
+            .gte('start_time', today_start.isoformat())\
+            .lte('end_time', today_end.isoformat())\
+            .order('start_time')\
+            .execute()
+            
+        return [Event(**event) for event in result.data]
+    except Exception as e:
+        logger.error(f"Error fetching today's events: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/events/upcoming")
+async def get_upcoming_events(days: int = 7):
+    """Haal events voor de komende X dagen op"""
+    try:
+        amsterdam_tz = ZoneInfo("Europe/Amsterdam")
+        now = datetime.datetime.now(amsterdam_tz)
+        end_date = now + datetime.timedelta(days=days)
+        
+        result = supabase.table('calendar_events')\
+            .select('*')\
+            .gte('start_time', now.isoformat())\
+            .lte('start_time', end_date.isoformat())\
+            .order('start_time')\
+            .execute()
+            
+        return [Event(**event) for event in result.data]
+    except Exception as e:
+        logger.error(f"Error fetching upcoming events: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 1. Statistieken
+@app.get("/api/stats", response_model=CalendarStats)
+async def get_stats():
+    """Haal statistieken op over alle events"""
+    try:
+        # Haal alle events op
+        result = supabase.table('calendar_events').select('*').execute()
+        events = result.data
+
+        # Bereken statistieken
+        stats = {
+            'total_events': len(events),
+            'events_per_calendar': {},
+            'busy_days': [],
+            'common_locations': []
+        }
+
+        # Events per agenda
+        for event in events:
+            calendar = event['calendar_name']
+            stats['events_per_calendar'][calendar] = stats['events_per_calendar'].get(calendar, 0) + 1
+
+        # Drukste dagen (top 3)
+        day_counts = {}
+        for event in events:
+            if 'T' in event['start_time']:  # Alleen events met tijd
+                day = datetime.datetime.fromisoformat(event['start_time']).strftime('%A')
+                day_counts[day] = day_counts.get(day, 0) + 1
+        
+        stats['busy_days'] = sorted(day_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+
+        # Meest voorkomende locaties (top 5)
+        location_counts = {}
+        for event in events:
+            if event.get('location'):
+                location_counts[event['location']] = location_counts.get(event['location'], 0) + 1
+        
+        stats['common_locations'] = sorted(location_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
+        return CalendarStats(**stats)
+
+    except Exception as e:
+        logger.error(f"Error fetching stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 2. Zoekfunctionaliteit
+@app.get("/api/events/search", response_model=SearchResult)
+async def search_events(
+    query: str,
+    calendar_name: Optional[str] = None,
+    include_description: bool = True
+):
+    """Zoek in events op basis van query"""
+    try:
+        # Start met basis query
+        db_query = supabase.table('calendar_events').select('*')
+
+        # Filter op calendar_name als opgegeven
+        if calendar_name:
+            db_query = db_query.eq('calendar_name', calendar_name)
+
+        # Voer de query uit
+        result = db_query.execute()
+        events = result.data
+
+        # Filter events op basis van zoekterm
+        matched_events = []
+        query = query.lower()
+        for event in events:
+            if query in event['summary'].lower():
+                matched_events.append(event)
+            elif include_description and event['description'] and query in event['description'].lower():
+                matched_events.append(event)
+            elif event['location'] and query in event['location'].lower():
+                matched_events.append(event)
+
+        # Converteer naar Event objecten
+        event_objects = [Event(**event) for event in matched_events]
+
+        return SearchResult(
+            events=event_objects,
+            total_count=len(event_objects),
+            query=query
+        )
+
+    except Exception as e:
+        logger.error(f"Error searching events: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 3. Notificaties
+@app.post("/api/notifications/setup")
+async def setup_notifications(settings: NotificationSettings):
+    """Setup email notificaties voor events"""
+    try:
+        # Sla notificatie settings op in Supabase
+        notification_data = {
+            'email': settings.email,
+            'before_minutes': settings.before_minutes,
+            'calendars': settings.calendars,
+            'enabled': settings.enabled,
+            'created_at': datetime.datetime.utcnow().isoformat(),
+            'updated_at': datetime.datetime.utcnow().isoformat()
+        }
+
+        result = supabase.table('notification_settings').upsert(notification_data).execute()
+        
+        return {
+            "message": "Notification settings saved",
+            "settings": settings.dict()
+        }
+
+    except Exception as e:
+        logger.error(f"Error setting up notifications: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/notifications/settings")
+async def get_notification_settings(email: str):
+    """Haal notificatie instellingen op"""
+    try:
+        result = supabase.table('notification_settings')\
+            .select('*')\
+            .eq('email', email)\
+            .execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="No notification settings found")
+
+        return NotificationSettings(**result.data[0])
+
+    except Exception as e:
+        logger.error(f"Error fetching notification settings: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
