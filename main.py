@@ -73,8 +73,8 @@ class SearchResult(BaseModel):
 class CalendarStats(BaseModel):
     total_events: int
     events_per_calendar: dict
-    busy_days: List[str]
-    common_locations: List[str]
+    busy_days: List[dict]
+    common_locations: List[dict]
 
 class NotificationSettings(BaseModel):
     email: str
@@ -378,7 +378,7 @@ async def get_stats():
                 day = datetime.datetime.fromisoformat(event['start_time']).strftime('%A')
                 day_counts[day] = day_counts.get(day, 0) + 1
         
-        stats['busy_days'] = sorted(day_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+        stats['busy_days'] = [{"day": day, "count": count} for day, count in sorted(day_counts.items(), key=lambda x: x[1], reverse=True)[:3]]
 
         # Meest voorkomende locaties (top 5)
         location_counts = {}
@@ -386,7 +386,7 @@ async def get_stats():
             if event.get('location'):
                 location_counts[event['location']] = location_counts.get(event['location'], 0) + 1
         
-        stats['common_locations'] = sorted(location_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        stats['common_locations'] = [{"location": loc, "count": count} for loc, count in sorted(location_counts.items(), key=lambda x: x[1], reverse=True)[:5]]
 
         return CalendarStats(**stats)
 
