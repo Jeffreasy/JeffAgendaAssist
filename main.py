@@ -104,36 +104,39 @@ async def sync_calendar(credentials):
 
 async def save_event_to_supabase(event):
     """Save event to Supabase"""
-    # Converteer tijden naar Amsterdam tijdzone
-    amsterdam_tz = ZoneInfo("Europe/Amsterdam")
-    
     # Helper functie voor tijd conversie
-    def convert_time(time_str):
+    def convert_time(time_dict):
+        if not time_dict:
+            return None
+            
+        # Haal de tijd uit de dictionary
+        time_str = time_dict.get('dateTime', time_dict.get('date'))
         if not time_str:
+            return None
+            
+        # Als het een hele dag event is (alleen datum)
+        if 'T' not in time_str:
             return time_str
-        # Als het een datetime is (met 'T' en 'Z')
-        if 'T' in time_str:
-            if time_str.endswith('Z'):
-                # Als de tijd in UTC (Z) is
-                dt = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
-            else:
-                # Als de tijd al een timezone heeft
-                dt = datetime.datetime.fromisoformat(time_str)
             
-            # Converteer naar Amsterdam tijd
-            amsterdam_tz = ZoneInfo("Europe/Amsterdam")
-            amsterdam_time = dt.astimezone(amsterdam_tz)
+        # Parse de tijd
+        if time_str.endswith('Z'):
+            dt = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+        else:
+            dt = datetime.datetime.fromisoformat(time_str)
             
-            # Voeg de timezone offset toe aan de string (+01:00 of +02:00)
-            return amsterdam_time.isoformat()
-        return time_str  # Als het een datum is (zonder tijd)
+        # Converteer naar Amsterdam tijd
+        amsterdam_tz = ZoneInfo("Europe/Amsterdam")
+        local_dt = dt.astimezone(amsterdam_tz)
+        
+        # Formatteer met expliciete timezone offset
+        return local_dt.strftime('%Y-%m-%d %H:%M:%S%z')
 
     event_data = {
         'google_event_id': event['id'],
         'summary': event.get('summary', 'Geen titel'),
         'description': event.get('description', ''),
-        'start_time': convert_time(event['start'].get('dateTime', event['start'].get('date'))),
-        'end_time': convert_time(event['end'].get('dateTime', event['end'].get('date'))),
+        'start_time': convert_time(event.get('start')),
+        'end_time': convert_time(event.get('end')),
         'location': event.get('location', ''),
         'status': event.get('status', 'confirmed'),
         'calendar_id': event.get('organizer', {}).get('email', 'primary'),
