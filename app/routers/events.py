@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from typing import Optional, List
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import time
 
 from app.config import supabase, logger
 from app.schemas import Event, EventUpdate, SearchResult, EventCategory, EventLabel, UpdateLabelsRequest, EventWithLabels
@@ -195,15 +196,16 @@ async def filter_events(
 ):
     """Filter events op category en labels met caching"""
     try:
-        # Cache key maken
+        start_time = time.time()
         cache_key = f"filter:{category}:{labels}:{start_date}:{end_date}"
         
         # Check cache eerst
         if cached_data := await get_cached_data(cache_key):
-            logger.info(f"Cache hit for {cache_key}")
+            process_time = (time.time() - start_time) * 1000
+            logger.info(f"Cache HIT - Time: {process_time:.2f}ms")
             return cached_data
 
-        # Als niet in cache, haal op uit database
+        # Database query (cache miss)
         query = supabase.table('calendar_events').select('*')
 
         if category:
@@ -218,9 +220,11 @@ async def filter_events(
         result = query.execute()
         events = [EventWithLabels(**event) for event in result.data]
 
-        # Sla op in cache
+        # Cache the result
         await set_cached_data(cache_key, events)
         
+        process_time = (time.time() - start_time) * 1000
+        logger.info(f"Cache MISS - Time: {process_time:.2f}ms")
         return events
 
     except Exception as e:
