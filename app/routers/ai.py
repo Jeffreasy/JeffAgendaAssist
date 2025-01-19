@@ -11,7 +11,10 @@ router = APIRouter()
 def get_openai_client():
     """Initialize OpenAI client with API key"""
     try:
-        return OpenAI(api_key=OPENAI_API_KEY, base_url="https://api.openai.com/v1")
+        return OpenAI(
+            api_key=OPENAI_API_KEY,
+            default_headers={"Content-Type": "application/json"}
+        )
     except Exception as e:
         logger.error(f"Error initializing OpenAI client: {str(e)}")
         raise HTTPException(status_code=500, detail="Error initializing AI service")
