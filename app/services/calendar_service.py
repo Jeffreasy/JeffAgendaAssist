@@ -10,31 +10,37 @@ def determine_category(event_data):
     """Bepaal category based op tijd en dag"""
     # Parse de tijd met timezone
     start_time_str = event_data['start_time']
-    if '+' in start_time_str:
-        # Als er een timezone offset is
-        start_time = datetime.datetime.strptime(
-            start_time_str, 
-            '%Y-%m-%d %H:%M:%S%z'
-        )
-    else:
-        # Als er geen timezone is
-        start_time = datetime.datetime.strptime(
-            start_time_str, 
-            '%Y-%m-%d %H:%M:%S'
-        ).replace(tzinfo=ZoneInfo("Europe/Amsterdam"))
-    
-    # Weekend check
-    if start_time.weekday() >= 5:  # 5=Zaterdag, 6=Zondag
-        return "weekend"
-    
-    # Tijd check (aangepaste tijden)
-    hour = start_time.hour
-    if 6 <= hour <= 14:  # Tot en met 14:00
-        return "vroeg"
-    elif 14 < hour <= 23:  # Vanaf 14:01
-        return "laat"
-    
-    return None
+    try:
+        # Parse de tijd en zet om naar Amsterdam tijd
+        if '+' in start_time_str:
+            start_time = datetime.datetime.strptime(
+                start_time_str, 
+                '%Y-%m-%d %H:%M:%S%z'
+            )
+        else:
+            start_time = datetime.datetime.strptime(
+                start_time_str, 
+                '%Y-%m-%d %H:%M:%S'
+            ).replace(tzinfo=ZoneInfo("Europe/Amsterdam"))
+
+        # Log voor debugging
+        logger.info(f"Determining category for time: {start_time} (hour: {start_time.hour})")
+        
+        # Weekend check
+        if start_time.weekday() >= 5:  # 5=Zaterdag, 6=Zondag
+            return "weekend"
+        
+        # Tijd check (aangepaste tijden)
+        hour = start_time.hour
+        if 6 <= hour < 14:  # Vroeg: 6:00 tot 13:59
+            return "vroeg"
+        elif 14 <= hour < 23:  # Laat: 14:00 tot 22:59
+            return "laat"
+        
+        return None  # Nacht: 23:00 tot 5:59
+    except Exception as e:
+        logger.error(f"Error determining category: {e}")
+        return None
 
 async def save_event_to_supabase(event):
     """Save event to Supabase"""
