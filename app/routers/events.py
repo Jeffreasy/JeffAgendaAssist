@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import supabase, logger
 from app.schemas import Event, EventUpdate, SearchResult, EventCategory, EventLabel, UpdateLabelsRequest, EventWithLabels
-from app.services.cache_service import get_cached_data, set_cached_data
+from app.services.cache_service import get_cached_data, set_cached_data, invalidate_cache, CacheTTL
 
 router = APIRouter()
 
@@ -19,6 +19,13 @@ async def get_events(
 ):
     """Haal events op uit Supabase met optionele filters"""
     try:
+        cache_key = f"events:{start_date}:{end_date}:{calendar_name}"
+        
+        # Check cache
+        if cached := await get_cached_data(cache_key):
+            return cached
+            
+        # Database query
         query = supabase.table('calendar_events').select('*')
 
         if start_date:
@@ -43,6 +50,8 @@ async def get_events(
                 is_recurring=event['is_recurring']
             ))
 
+        # Cache resultaat (1 uur)
+        await set_cached_data(cache_key, events, CacheTTL.MEDIUM)
         return events
     except Exception as e:
         logger.error(f"Error fetching events: {str(e)}")
@@ -52,9 +61,19 @@ async def get_events(
 async def get_calendars():
     """Haal lijst van unieke agenda-namen op"""
     try:
+        cache_key = "calendars:list"
+        
+        # Check cache
+        if cached := await get_cached_data(cache_key):
+            return cached
+            
+        # Database query
         result = supabase.table('calendar_events').select('calendar_name').execute()
-        calendars = list(set(event['calendar_name'] for event in result.data))
-        return {"calendars": calendars}
+        calendars = {"calendars": list(set(event['calendar_name'] for event in result.data))}
+        
+        # Cache resultaat (1 dag)
+        await set_cached_data(cache_key, calendars, CacheTTL.LONG)
+        return calendars
     except Exception as e:
         logger.error(f"Error fetching calendars: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -288,3 +307,13 @@ async def test_cache():
     except Exception as e:
         logger.error(f"Cache test error: {str(e)}")
         return {"error": str(e)}
+
+@router.post("/cache/clear")
+async def clear_cache(pattern: Optional[str] = None):
+    """Clear cache entries"""
+    try:
+        await invalidate_cache(pattern)
+        return {"message": f"Cache cleared{f' for pattern: {pattern}' if pattern else ''}"} 
+    except Exception as e:
+        logger.error(f"Error clearing cache: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -18,14 +18,18 @@ CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS')
 # Voeg toe aan environment variables
 REDIS_URL = os.getenv('REDIS_URL', None)  # Geen default, zodat we weten als het mist
 CACHE_ENABLED = os.getenv('CACHE_ENABLED', 'true').lower() == 'true'
-CACHE_TTL = int(os.getenv('CACHE_TTL', '300'))
+CACHE_TTL_SHORT = int(os.getenv('CACHE_TTL_SHORT', '300'))    # 5 minuten
+CACHE_TTL_MEDIUM = int(os.getenv('CACHE_TTL_MEDIUM', '3600')) # 1 uur
+CACHE_TTL_LONG = int(os.getenv('CACHE_TTL_LONG', '86400'))    # 1 dag
 
 # Log de effectieve configuratie
 logger.info("="*50)
 logger.info("CONFIGURATION")
 logger.info(f"REDIS_URL configured: {bool(REDIS_URL)}")
 logger.info(f"CACHE_ENABLED: {CACHE_ENABLED}")
-logger.info(f"CACHE_TTL: {CACHE_TTL}")
+logger.info(f"CACHE_TTL_SHORT: {CACHE_TTL_SHORT}")
+logger.info(f"CACHE_TTL_MEDIUM: {CACHE_TTL_MEDIUM}")
+logger.info(f"CACHE_TTL_LONG: {CACHE_TTL_LONG}")
 logger.info("="*50)
 
 # Maak de Supabase-client

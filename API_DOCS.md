@@ -151,3 +151,11 @@ Alle responses bevatten de volgende headers:
 - `X-Response-Time`: Tijd in milliseconden voor het verwerken van het request
 
 ### Voorbeeld Response Headers
+
+### Cache Management
+GET /api/events/cache/status     # Check cache status
+POST /api/events/cache/clear     # Clear cache entries
+
+Parameters:
+- pattern: Optional pattern to clear specific cache entries
+  Example: "events:*" clears all event caches

@@ -1,7 +1,9 @@
 import redis
 from datetime import timedelta
 import json
-from app.config import REDIS_URL, logger
+from app.config import REDIS_URL, logger, CACHE_TTL_SHORT, CACHE_TTL_MEDIUM, CACHE_TTL_LONG
+from enum import Enum
+from typing import Optional, Any
 
 # Uitgebreide debug logging
 logger.info("="*50)
@@ -29,6 +31,11 @@ else:
         logger.error(f"Redis initialization failed: {str(e)}")
         redis_client = None
 
+class CacheTTL(Enum):
+    SHORT = "short"   # 5 min
+    MEDIUM = "medium" # 1 uur
+    LONG = "long"     # 1 dag
+
 async def get_cached_data(key: str):
     """Haal data op uit Redis cache"""
     if not redis_client:
@@ -44,26 +51,45 @@ async def get_cached_data(key: str):
         logger.error(f"Cache get error: {str(e)}")
         return None
 
-async def set_cached_data(key: str, data: dict, expire_seconds: int = 300):
-    """Sla data op in Redis cache"""
+async def set_cached_data(key: str, data: Any, ttl_type: CacheTTL = CacheTTL.SHORT):
+    """Sla data op in Redis cache met verschillende TTLs"""
     if not redis_client:
         logger.warning("Redis client not initialized")
-        return
+        return False
         
     try:
         json_data = json.dumps(data)
-        logger.info(f"Attempting to cache data for key: {key}")
-        logger.info(f"Data size: {len(json_data)} bytes")
+        
+        # TTL bepalen
+        ttl_mapping = {
+            CacheTTL.SHORT: CACHE_TTL_SHORT,
+            CacheTTL.MEDIUM: CACHE_TTL_MEDIUM,
+            CacheTTL.LONG: CACHE_TTL_LONG
+        }
+        expire_seconds = ttl_mapping.get(ttl_type, CACHE_TTL_SHORT)
         
         success = redis_client.setex(key, expire_seconds, json_data)
-        logger.info(f"Cache set success: {success}")
-        
-        # Verify the data was stored
-        stored_data = redis_client.get(key)
-        logger.info(f"Verification - data in cache: {bool(stored_data)}")
-        
+        logger.info(f"Cache set with TTL {ttl_type.value}: {success}")
         return success
     except Exception as e:
         logger.error(f"Cache set error: {str(e)}")
-        logger.error(f"Error type: {type(e).__name__}")
-        return False 
+        return False
+
+async def invalidate_cache(pattern: str = None):
+    """Verwijder specifieke of alle cache entries"""
+    if not redis_client:
+        return
+        
+    try:
+        if pattern:
+            # Verwijder keys die matchen met pattern
+            keys = redis_client.keys(pattern)
+            if keys:
+                redis_client.delete(*keys)
+                logger.info(f"Invalidated {len(keys)} keys matching {pattern}")
+        else:
+            # Verwijder alle keys
+            redis_client.flushdb()
+            logger.info("Cleared entire cache")
+    except Exception as e:
+        logger.error(f"Cache invalidation error: {str(e)}") 
