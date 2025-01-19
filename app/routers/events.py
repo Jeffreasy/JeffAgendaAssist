@@ -228,7 +228,22 @@ async def filter_events(
             query = query.lte('end_time', end_date)
 
         result = query.execute()
-        events = [EventWithLabels(**event) for event in result.data]
+        
+        # Convert to dict before caching/returning
+        events = [
+            {
+                "summary": event["summary"],
+                "description": event.get("description", ""),
+                "start_time": event["start_time"],
+                "end_time": event["end_time"],
+                "location": event.get("location", ""),
+                "calendar_name": event["calendar_name"],
+                "is_recurring": event["is_recurring"],
+                "category": event.get("category"),
+                "labels": event.get("labels", [])
+            }
+            for event in result.data
+        ]
 
         # Cache the result
         await set_cached_data(cache_key, events)
