@@ -4,6 +4,7 @@ import sys
 import os
 import logging
 import httpx
+from fastapi.middleware.cors import CORSMiddleware
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +19,15 @@ httpx.USE_CLIENT_DEFAULT = True
 # Importeer de app van main.py
 from app.main import app
 
+# CORS configuratie voor de frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "https://jeff-agenda-frontend.vercel.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Dit is nodig voor Vercel
-async def handler(request: Request):
-    return await app(request.scope, request.receive, request.send) 
+def handler(request):
+    return app 
