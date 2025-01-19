@@ -4,6 +4,7 @@ import logging
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from google_auth_oauthlib.flow import Flow
+import openai
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,3 +61,7 @@ else:
         scopes=SCOPES,
         redirect_uri='https://jeff-agenda-assist.vercel.app/api/auth/callback'
     )
+
+# OpenAI Configuration
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+openai.api_key = OPENAI_API_KEY

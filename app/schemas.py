@@ -52,3 +52,10 @@ class EventWithLabels(Event):  # Extends bestaande Event model
 class UpdateLabelsRequest(BaseModel):
     category: Optional[EventCategory] = None
     labels: Optional[List[EventLabel]] = None
+
+class ChatMessage(BaseModel):
+    content: str
+    
+class ChatResponse(BaseModel):
+    response: str
+    events_analyzed: int

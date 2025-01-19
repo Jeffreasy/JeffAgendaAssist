@@ -173,3 +173,12 @@ All endpoints include the following CORS headers:
 - Access-Control-Allow-Credentials: true
 - Access-Control-Allow-Methods: *
 - Access-Control-Allow-Headers: *
+
+### AI Assistant Endpoints
+POST /api/ai/chat
+- Chat met de AI over je agenda
+- Body: {"content": "string"}
+
+POST /api/ai/analyze
+- Analyseer je agenda
+- Query params: days (optional, default=7)
