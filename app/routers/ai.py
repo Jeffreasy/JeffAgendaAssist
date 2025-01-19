@@ -8,8 +8,13 @@ from app.schemas import ChatMessage, ChatResponse, AIRequest, AIResponse, AIAnal
 
 router = APIRouter()
 
-# Initialize client without proxies
-client = OpenAI()  # API key will be read from environment
+def get_openai_client():
+    """Initialize OpenAI client with API key"""
+    try:
+        return OpenAI(api_key=OPENAI_API_KEY, base_url="https://api.openai.com/v1")
+    except Exception as e:
+        logger.error(f"Error initializing OpenAI client: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error initializing AI service")
 
 async def get_relevant_events(days: int = 7):
     """Haal relevante events op voor context"""
@@ -41,7 +46,7 @@ async def chat_with_assistant(request: AIRequest):
             context += f"- {event['summary']} op {event['start_time']}\n"
         
         # New OpenAI syntax
-        response = client.chat.completions.create(
+        response = get_openai_client().chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": context},
@@ -80,7 +85,7 @@ async def analyze_schedule(days: Optional[int] = 7):
             prompt += f"- {event['summary']} ({event['category']}) op {event['start_time']}\n"
         
         # New OpenAI syntax
-        response = client.chat.completions.create(
+        response = get_openai_client().chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Je bent een agenda analyst die helpt bij timemanagement."},
