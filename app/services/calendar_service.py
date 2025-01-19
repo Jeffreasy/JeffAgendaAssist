@@ -54,7 +54,7 @@ def determine_category(event_data):
 async def save_event_to_supabase(event):
     """Save event to Supabase"""
     try:
-        # Parse Google Calendar tijd direct naar Amsterdam tijd
+        # Parse Google Calendar tijd
         start_time_raw = event.get('start', {}).get('dateTime')
         end_time_raw = event.get('end', {}).get('dateTime')
 
@@ -62,22 +62,47 @@ async def save_event_to_supabase(event):
         amsterdam_tz = ZoneInfo("Europe/Amsterdam")
         
         if start_time_raw:
-            start_time = datetime.datetime.fromisoformat(start_time_raw).astimezone(amsterdam_tz)
+            # Parse ISO format en converteer naar Amsterdam
+            start_time = datetime.datetime.fromisoformat(start_time_raw)
+            if start_time.tzinfo is None:
+                # Als geen timezone, neem aan UTC
+                start_time = start_time.replace(tzinfo=datetime.UTC)
+            # Converteer naar Amsterdam
+            start_time = start_time.astimezone(amsterdam_tz)
+            # Format voor database (met Amsterdam offset)
             start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S%z')
+            
+            # Debug logging
+            logger.info(f"Raw start: {start_time_raw}")
+            logger.info(f"Parsed start: {start_time}")
+            logger.info(f"Final start: {start_time_str}")
         else:
             start_time_str = None
+            start_time = None
 
+        # Zelfde voor end time
         if end_time_raw:
-            end_time = datetime.datetime.fromisoformat(end_time_raw).astimezone(amsterdam_tz)
+            end_time = datetime.datetime.fromisoformat(end_time_raw)
+            if end_time.tzinfo is None:
+                end_time = end_time.replace(tzinfo=datetime.UTC)
+            end_time = end_time.astimezone(amsterdam_tz)
             end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S%z')
         else:
             end_time_str = None
+            end_time = None
 
-        # Log voor debugging
-        logger.info(f"Raw start time: {start_time_raw}")
-        logger.info(f"Amsterdam start time: {start_time_str}")
-        
-        # Dan event_data maken
+        # Bepaal categorie direct met het datetime object
+        category = None
+        if start_time:
+            hour = start_time.hour
+            if start_time.weekday() >= 5:
+                category = "weekend"
+            elif 6 <= hour < 14:
+                category = "vroeg"
+            elif 14 <= hour < 23:
+                category = "laat"
+
+        # Event data
         event_data = {
             'google_event_id': event['id'],
             'summary': event.get('summary', 'Geen titel'),
@@ -94,22 +119,22 @@ async def save_event_to_supabase(event):
             'conference_data': event.get('conferenceData', {}),
             'color_id': event.get('colorId'),
             'visibility': event.get('visibility', 'default'),
-            'updated_at': datetime.datetime.utcnow().isoformat()
+            'updated_at': datetime.datetime.now(amsterdam_tz).isoformat(),
+            'category': category,
+            'labels': []
         }
 
-        # Categorie bepalen met de geconverteerde tijd
-        category_data = {'start_time': start_time_str}
-        event_data['category'] = determine_category(category_data)
-        event_data['labels'] = []  # Default empty labels
-
-        logger.info(f"Saving event: {event_data['summary']} at {start_time_str} with category {event_data['category']}")
+        # Debug logging
+        logger.info(f"Saving event: {event_data['summary']}")
+        logger.info(f"Time: {start_time_str}")
+        logger.info(f"Category: {category}")
 
         result = supabase.table('calendar_events').upsert(event_data).execute()
-        logger.info(f"Event opgeslagen: {event_data['summary']} ({event_data['calendar_name']})")
         return result
 
     except Exception as e:
-        logger.error(f"Fout bij opslaan event: {e}")
+        logger.error(f"Error saving event: {str(e)}")
+        logger.error(f"Event data: {event}")
         return None
 
 async def sync_calendar(credentials):
