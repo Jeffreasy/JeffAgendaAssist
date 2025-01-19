@@ -1,12 +1,15 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
-import openai
+from openai import OpenAI
 from datetime import datetime, timedelta
 
 from app.config import OPENAI_API_KEY, supabase, logger
 from app.schemas import ChatMessage, ChatResponse, AIRequest, AIResponse, AIAnalysis, ErrorResponse
 
 router = APIRouter()
+
+# Initialize client
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 async def get_relevant_events(days: int = 7):
     """Haal relevante events op voor context"""
@@ -29,18 +32,16 @@ async def get_relevant_events(days: int = 7):
 async def chat_with_assistant(request: AIRequest):
     """Chat met de AI over je agenda"""
     try:
-        # Haal relevante events op
         events = await get_relevant_events()
         
-        # Bouw de context
         context = "Je bent een behulpzame agenda assistent. "
         context += "Dit zijn de komende events:\n"
         
         for event in events:
             context += f"- {event['summary']} op {event['start_time']}\n"
         
-        # OpenAI chat completion
-        response = openai.ChatCompletion.create(
+        # New OpenAI syntax
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": context},
@@ -78,7 +79,8 @@ async def analyze_schedule(days: Optional[int] = 7):
         for event in events:
             prompt += f"- {event['summary']} ({event['category']}) op {event['start_time']}\n"
         
-        response = openai.ChatCompletion.create(
+        # New OpenAI syntax
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Je bent een agenda analyst die helpt bij timemanagement."},
