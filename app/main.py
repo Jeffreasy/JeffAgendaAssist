@@ -52,6 +52,6 @@ async def health():
 # Routers koppelen met hun prefix
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(events.router, prefix="/api/events", tags=["events"])
-app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
+app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
