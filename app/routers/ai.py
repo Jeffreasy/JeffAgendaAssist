@@ -76,21 +76,32 @@ async def analyze_schedule(days: Optional[int] = 7):
         for event in events:
             prompt += f"- {event['summary']} ({event['category']}) op {event['start_time']}\n"
         
-        # New OpenAI syntax
-        response = get_openai_client().chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Je bent een agenda analyst die helpt bij timemanagement."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        
-        return AIAnalysis(
-            analysis=response.choices[0].message.content,
-            events_analyzed=len(events),
-            period_days=days
-        )
-        
+        try:
+            client = get_openai_client()
+            # New OpenAI syntax with better error handling
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "Je bent een agenda analyst die helpt bij timemanagement."},
+                    {"role": "user", "content": prompt}
+                ],
+                timeout=30.0
+            )
+            
+            return AIAnalysis(
+                analysis=response.choices[0].message.content,
+                events_analyzed=len(events),
+                period_days=days
+            )
+        except Exception as e:
+            logger.error(f"OpenAI API error: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail={"detail": f"OpenAI API error: {str(e)}", "status": 500}
+            )
+            
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"AI analysis error: {str(e)}")
         raise HTTPException(
