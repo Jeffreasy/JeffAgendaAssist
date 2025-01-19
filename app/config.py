@@ -22,6 +22,9 @@ CACHE_TTL_SHORT = int(os.getenv('CACHE_TTL_SHORT', '300'))    # 5 minuten
 CACHE_TTL_MEDIUM = int(os.getenv('CACHE_TTL_MEDIUM', '3600')) # 1 uur
 CACHE_TTL_LONG = int(os.getenv('CACHE_TTL_LONG', '86400'))    # 1 dag
 
+# CORS Configuration
+CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,https://jeff-agenda-assist.vercel.app').split(',')
+
 # Log de effectieve configuratie
 logger.info("="*50)
 logger.info("CONFIGURATION")

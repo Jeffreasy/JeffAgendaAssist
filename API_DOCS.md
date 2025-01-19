@@ -159,3 +159,17 @@ POST /api/events/cache/clear     # Clear cache entries
 Parameters:
 - pattern: Optional pattern to clear specific cache entries
   Example: "events:*" clears all event caches
+
+## CORS Configuration
+The API supports Cross-Origin Resource Sharing (CORS) with the following settings:
+
+### Allowed Origins
+- http://localhost:3000 (React development)
+- http://localhost:5173 (Vite development)
+- https://jeff-agenda-assist.vercel.app (Production)
+
+### CORS Headers
+All endpoints include the following CORS headers:
+- Access-Control-Allow-Credentials: true
+- Access-Control-Allow-Methods: *
+- Access-Control-Allow-Headers: *

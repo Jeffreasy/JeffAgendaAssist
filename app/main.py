@@ -1,10 +1,21 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import logger, supabase, CREDENTIALS_FILE
+from app.config import logger, supabase, CREDENTIALS_FILE, CORS_ORIGINS
 from app.routers import auth, events, notifications, stats
 from app.middleware.performance import performance_middleware
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
 app.middleware("http")(performance_middleware)
 
 @app.get("/")
