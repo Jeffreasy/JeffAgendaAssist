@@ -4,6 +4,7 @@ import sys
 import os
 import logging
 import httpx
+from http.server import BaseHTTPRequestHandler
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -19,5 +20,11 @@ httpx.USE_CLIENT_DEFAULT = True
 from app.main import app
 
 # Dit is nodig voor Vercel
-def handler(request: Request):
-    return app 
+class handler(BaseHTTPRequestHandler):
+    def __init__(self, req, res, **kwargs):
+        self.req = req
+        self.send = res
+        
+    def handle(self):
+        response = app(self.req, self.send)
+        return response 
