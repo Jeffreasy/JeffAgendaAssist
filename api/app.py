@@ -19,7 +19,5 @@ httpx.USE_CLIENT_DEFAULT = True
 from app.main import app
 
 # Dit is nodig voor Vercel
-def app_handler(scope, receive, send):
-    return app(scope, receive, send)
-
-app = app_handler 
+def handler(request: Request):
+    return app 
