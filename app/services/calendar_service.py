@@ -11,17 +11,25 @@ def determine_category(event_data):
     # Parse de tijd met timezone
     start_time_str = event_data['start_time']
     try:
-        # Parse de tijd en zet om naar Amsterdam tijd
+        # Als er een + in de string staat, gaan we ervan uit dat de offset correct meegegeven is
         if '+' in start_time_str:
             start_time = datetime.datetime.strptime(
-                start_time_str, 
+                start_time_str,
                 '%Y-%m-%d %H:%M:%S%z'
             )
+            # Converteer daarna expliciet naar Amsterdam
+            start_time = start_time.astimezone(ZoneInfo("Europe/Amsterdam"))
         else:
-            start_time = datetime.datetime.strptime(
+            # Hier komt de 'naïeve' tijd binnen (zonder offset).
+            # We gaan ervan uit dat deze in UTC is en converteren vervolgens naar Amsterdam-tijd.
+            naive_start = datetime.datetime.strptime(
                 start_time_str, 
                 '%Y-%m-%d %H:%M:%S'
-            ).replace(tzinfo=ZoneInfo("Europe/Amsterdam"))
+            )
+            # Label de tijd eerst als UTC
+            start_time_utc = naive_start.replace(tzinfo=ZoneInfo("UTC"))
+            # Converteer nu naar Europe/Amsterdam
+            start_time = start_time_utc.astimezone(ZoneInfo("Europe/Amsterdam"))
 
         # Log voor debugging
         logger.info(f"Determining category for time: {start_time} (hour: {start_time.hour})")
@@ -37,7 +45,8 @@ def determine_category(event_data):
         elif 14 <= hour < 23:  # Laat: 14:00 tot 22:59
             return "laat"
         
-        return None  # Nacht: 23:00 tot 5:59
+        # In alle andere gevallen (bijv. nacht)
+        return None
     except Exception as e:
         logger.error(f"Error determining category: {e}")
         return None
