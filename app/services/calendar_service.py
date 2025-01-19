@@ -55,54 +55,41 @@ async def save_event_to_supabase(event):
     """Save event to Supabase"""
     try:
         # Debug de ruwe Google Calendar data
-        logger.info("=== RAW GOOGLE CALENDAR DATA ===")
-        logger.info(f"Event: {event['summary']}")
-        logger.info(f"Raw start data: {event.get('start')}")
-        logger.info(f"Raw end data: {event.get('end')}")
+        logger.info(f"=== Event: {event['summary']} ===")
+        logger.info(f"Raw start: {event.get('start')}")
         
-        # Parse Google Calendar tijd
-        start_time_raw = event.get('start', {}).get('dateTime')
-        if not start_time_raw:
-            # Als dateTime niet bestaat, probeer date (voor hele dag events)
-            start_time_raw = event.get('start', {}).get('date')
+        # Check of het een hele dag event is
+        is_all_day = 'date' in event.get('start', {})
         
-        # Parse en converteer naar Amsterdam tijd
-        amsterdam_tz = ZoneInfo("Europe/Amsterdam")
-        
-        if start_time_raw:
-            # Parse ISO format en converteer naar Amsterdam
-            logger.info(f"Parsing time: {start_time_raw}")
-            start_time = datetime.datetime.fromisoformat(start_time_raw)
-            logger.info(f"After parse: {start_time} (tzinfo: {start_time.tzinfo})")
-            
-            if start_time.tzinfo is None:
-                # Als geen timezone, neem aan UTC
-                start_time = start_time.replace(tzinfo=datetime.UTC)
-                logger.info(f"After UTC: {start_time}")
-            
-            # Converteer naar Amsterdam
-            start_time = start_time.astimezone(amsterdam_tz)
-            logger.info(f"After Amsterdam: {start_time}")
-            
-            # Format voor database (met Amsterdam offset)
+        if is_all_day:
+            # Hele dag event (zoals verjaardagen)
+            start_date = event['start']['date']
+            end_date = event['end']['date']
+            # Zet om naar datetime met Amsterdam timezone
+            start_time = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+            start_time = start_time.replace(hour=0, minute=0, tzinfo=ZoneInfo("Europe/Amsterdam"))
             start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S%z')
-            logger.info(f"Final string: {start_time_str}")
-            
         else:
-            start_time_str = None
-            start_time = None
-
+            # Normaal event met tijd
+            start_time_raw = event['start']['dateTime']
+            # Parse direct als ISO format (bevat al timezone info)
+            start_time = datetime.datetime.fromisoformat(start_time_raw)
+            # Converteer naar Amsterdam
+            start_time = start_time.astimezone(ZoneInfo("Europe/Amsterdam"))
+            start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S%z')
+            
+        logger.info(f"Final start time: {start_time_str}")
+        
         # Zelfde voor end time
-        end_time_raw = event.get('end', {}).get('dateTime')
-        if end_time_raw:
-            end_time = datetime.datetime.fromisoformat(end_time_raw)
-            if end_time.tzinfo is None:
-                end_time = end_time.replace(tzinfo=datetime.UTC)
-            end_time = end_time.astimezone(amsterdam_tz)
+        if is_all_day:
+            end_time = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+            end_time = end_time.replace(hour=23, minute=59, tzinfo=ZoneInfo("Europe/Amsterdam"))
             end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S%z')
         else:
-            end_time_str = None
-            end_time = None
+            end_time_raw = event['end']['dateTime']
+            end_time = datetime.datetime.fromisoformat(end_time_raw)
+            end_time = end_time.astimezone(ZoneInfo("Europe/Amsterdam"))
+            end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S%z')
 
         # Bepaal categorie direct met het datetime object
         category = None
@@ -132,7 +119,7 @@ async def save_event_to_supabase(event):
             'conference_data': event.get('conferenceData', {}),
             'color_id': event.get('colorId'),
             'visibility': event.get('visibility', 'default'),
-            'updated_at': datetime.datetime.now(amsterdam_tz).isoformat(),
+            'updated_at': datetime.datetime.now(ZoneInfo("Europe/Amsterdam")).isoformat(),
             'category': category,
             'labels': []
         }
