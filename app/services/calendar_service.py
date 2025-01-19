@@ -54,33 +54,46 @@ def determine_category(event_data):
 async def save_event_to_supabase(event):
     """Save event to Supabase"""
     try:
+        # Debug de ruwe Google Calendar data
+        logger.info("=== RAW GOOGLE CALENDAR DATA ===")
+        logger.info(f"Event: {event['summary']}")
+        logger.info(f"Raw start data: {event.get('start')}")
+        logger.info(f"Raw end data: {event.get('end')}")
+        
         # Parse Google Calendar tijd
         start_time_raw = event.get('start', {}).get('dateTime')
-        end_time_raw = event.get('end', {}).get('dateTime')
-
+        if not start_time_raw:
+            # Als dateTime niet bestaat, probeer date (voor hele dag events)
+            start_time_raw = event.get('start', {}).get('date')
+        
         # Parse en converteer naar Amsterdam tijd
         amsterdam_tz = ZoneInfo("Europe/Amsterdam")
         
         if start_time_raw:
             # Parse ISO format en converteer naar Amsterdam
+            logger.info(f"Parsing time: {start_time_raw}")
             start_time = datetime.datetime.fromisoformat(start_time_raw)
+            logger.info(f"After parse: {start_time} (tzinfo: {start_time.tzinfo})")
+            
             if start_time.tzinfo is None:
                 # Als geen timezone, neem aan UTC
                 start_time = start_time.replace(tzinfo=datetime.UTC)
+                logger.info(f"After UTC: {start_time}")
+            
             # Converteer naar Amsterdam
             start_time = start_time.astimezone(amsterdam_tz)
+            logger.info(f"After Amsterdam: {start_time}")
+            
             # Format voor database (met Amsterdam offset)
             start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S%z')
+            logger.info(f"Final string: {start_time_str}")
             
-            # Debug logging
-            logger.info(f"Raw start: {start_time_raw}")
-            logger.info(f"Parsed start: {start_time}")
-            logger.info(f"Final start: {start_time_str}")
         else:
             start_time_str = None
             start_time = None
 
         # Zelfde voor end time
+        end_time_raw = event.get('end', {}).get('dateTime')
         if end_time_raw:
             end_time = datetime.datetime.fromisoformat(end_time_raw)
             if end_time.tzinfo is None:
