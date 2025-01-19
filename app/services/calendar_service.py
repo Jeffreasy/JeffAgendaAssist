@@ -44,12 +44,17 @@ def determine_category(event_data):
 
 async def save_event_to_supabase(event):
     """Save event to Supabase"""
+    # Eerst de tijden converteren
+    start_time = convert_time(event.get('start'))
+    end_time = convert_time(event.get('end'))
+    
+    # Dan event_data maken
     event_data = {
         'google_event_id': event['id'],
         'summary': event.get('summary', 'Geen titel'),
         'description': event.get('description', ''),
-        'start_time': convert_time(event.get('start')),
-        'end_time': convert_time(event.get('end')),
+        'start_time': start_time,
+        'end_time': end_time,
         'location': event.get('location', ''),
         'status': event.get('status', 'confirmed'),
         'calendar_id': event.get('organizer', {}).get('email', 'primary'),
@@ -60,10 +65,15 @@ async def save_event_to_supabase(event):
         'conference_data': event.get('conferenceData', {}),
         'color_id': event.get('colorId'),
         'visibility': event.get('visibility', 'default'),
-        'updated_at': datetime.datetime.utcnow().isoformat(),
-        'category': determine_category(event_data),
-        'labels': []  # Default empty labels
+        'updated_at': datetime.datetime.utcnow().isoformat()
     }
+
+    # Categorie bepalen met de geconverteerde tijd
+    category_data = {'start_time': start_time}
+    event_data['category'] = determine_category(category_data)
+    event_data['labels'] = []  # Default empty labels
+
+    logger.info(f"Saving event: {event_data['summary']} at {start_time} with category {event_data['category']}")
 
     try:
         result = supabase.table('calendar_events').upsert(event_data).execute()
