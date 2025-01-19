@@ -199,12 +199,16 @@ async def filter_events(
     try:
         start_time = time.time()
         cache_key = f"filter:{category}:{labels}:{start_date}:{end_date}"
+        logger.info(f"Using cache key: {cache_key}")
         
         # Headers voor response
         headers = {"X-Cache-Status": "MISS", "X-Response-Time": "0"}
         
         # Check cache eerst
-        if cached_data := await get_cached_data(cache_key):
+        cached_data = await get_cached_data(cache_key)
+        logger.info(f"Cache lookup result: {cached_data is not None}")
+        
+        if cached_data:
             process_time = (time.time() - start_time) * 1000
             headers.update({
                 "X-Cache-Status": "HIT",
@@ -261,3 +265,26 @@ async def filter_events(
     except Exception as e:
         logger.error(f"Error filtering events: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/test-cache")
+async def test_cache():
+    """Test Redis connection and caching"""
+    try:
+        # Test key
+        test_key = "test-cache-key"
+        test_data = {"test": "data", "timestamp": str(datetime.now())}
+        
+        # Try to set data
+        await set_cached_data(test_key, test_data)
+        
+        # Try to get data back
+        cached = await get_cached_data(test_key)
+        
+        return {
+            "set_data": test_data,
+            "cached_data": cached,
+            "cache_working": cached is not None
+        }
+    except Exception as e:
+        logger.error(f"Cache test error: {str(e)}")
+        return {"error": str(e)}
