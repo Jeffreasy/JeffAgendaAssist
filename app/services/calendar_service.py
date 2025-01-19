@@ -53,41 +53,61 @@ def determine_category(event_data):
 
 async def save_event_to_supabase(event):
     """Save event to Supabase"""
-    # Eerst de tijden converteren
-    start_time = convert_time(event.get('start'))
-    end_time = convert_time(event.get('end'))
-    
-    # Dan event_data maken
-    event_data = {
-        'google_event_id': event['id'],
-        'summary': event.get('summary', 'Geen titel'),
-        'description': event.get('description', ''),
-        'start_time': start_time,
-        'end_time': end_time,
-        'location': event.get('location', ''),
-        'status': event.get('status', 'confirmed'),
-        'calendar_id': event.get('organizer', {}).get('email', 'primary'),
-        'calendar_name': event.get('calendar_name', 'Primary'),
-        'recurring_event_id': event.get('recurringEventId', None),
-        'is_recurring': bool(event.get('recurringEventId')),
-        'attendees': event.get('attendees', []),
-        'conference_data': event.get('conferenceData', {}),
-        'color_id': event.get('colorId'),
-        'visibility': event.get('visibility', 'default'),
-        'updated_at': datetime.datetime.utcnow().isoformat()
-    }
-
-    # Categorie bepalen met de geconverteerde tijd
-    category_data = {'start_time': start_time}
-    event_data['category'] = determine_category(category_data)
-    event_data['labels'] = []  # Default empty labels
-
-    logger.info(f"Saving event: {event_data['summary']} at {start_time} with category {event_data['category']}")
-
     try:
+        # Parse Google Calendar tijd direct naar Amsterdam tijd
+        start_time_raw = event.get('start', {}).get('dateTime')
+        end_time_raw = event.get('end', {}).get('dateTime')
+
+        # Parse en converteer naar Amsterdam tijd
+        amsterdam_tz = ZoneInfo("Europe/Amsterdam")
+        
+        if start_time_raw:
+            start_time = datetime.datetime.fromisoformat(start_time_raw).astimezone(amsterdam_tz)
+            start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S%z')
+        else:
+            start_time_str = None
+
+        if end_time_raw:
+            end_time = datetime.datetime.fromisoformat(end_time_raw).astimezone(amsterdam_tz)
+            end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S%z')
+        else:
+            end_time_str = None
+
+        # Log voor debugging
+        logger.info(f"Raw start time: {start_time_raw}")
+        logger.info(f"Amsterdam start time: {start_time_str}")
+        
+        # Dan event_data maken
+        event_data = {
+            'google_event_id': event['id'],
+            'summary': event.get('summary', 'Geen titel'),
+            'description': event.get('description', ''),
+            'start_time': start_time_str,
+            'end_time': end_time_str,
+            'location': event.get('location', ''),
+            'status': event.get('status', 'confirmed'),
+            'calendar_id': event.get('organizer', {}).get('email', 'primary'),
+            'calendar_name': event.get('calendar_name', 'Primary'),
+            'recurring_event_id': event.get('recurringEventId', None),
+            'is_recurring': bool(event.get('recurringEventId')),
+            'attendees': event.get('attendees', []),
+            'conference_data': event.get('conferenceData', {}),
+            'color_id': event.get('colorId'),
+            'visibility': event.get('visibility', 'default'),
+            'updated_at': datetime.datetime.utcnow().isoformat()
+        }
+
+        # Categorie bepalen met de geconverteerde tijd
+        category_data = {'start_time': start_time_str}
+        event_data['category'] = determine_category(category_data)
+        event_data['labels'] = []  # Default empty labels
+
+        logger.info(f"Saving event: {event_data['summary']} at {start_time_str} with category {event_data['category']}")
+
         result = supabase.table('calendar_events').upsert(event_data).execute()
         logger.info(f"Event opgeslagen: {event_data['summary']} ({event_data['calendar_name']})")
         return result
+
     except Exception as e:
         logger.error(f"Fout bij opslaan event: {e}")
         return None
