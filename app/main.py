@@ -1,11 +1,21 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 from app.config import logger, supabase, CREDENTIALS_FILE, CORS_ORIGINS
 from app.routers import auth, events, notifications, stats, ai
 from app.middleware.performance import performance_middleware
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown events"""
+    # Startup
+    logger.info("Starting up...")
+    yield
+    # Shutdown
+    logger.info("Shutting down...")
+
+app = FastAPI(lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(

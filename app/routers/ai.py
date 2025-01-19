@@ -1,22 +1,12 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
-from openai import OpenAI
 from datetime import datetime, timedelta
-import os
 
-from app.config import OPENAI_API_KEY, supabase, logger
+from app.config import supabase, logger
 from app.schemas import ChatMessage, ChatResponse, AIRequest, AIResponse, AIAnalysis, ErrorResponse
+from app.utils.ai_client import get_openai_client
 
 router = APIRouter()
-
-def get_openai_client():
-    """Initialize OpenAI client with API key"""
-    try:
-        # Gebruik de OpenAI client zonder extra configuratie
-        return OpenAI(api_key=OPENAI_API_KEY)
-    except Exception as e:
-        logger.error(f"Error initializing OpenAI client: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error initializing AI service")
 
 async def get_relevant_events(days: int = 7):
     """Haal relevante events op voor context"""
