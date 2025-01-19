@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from enum import Enum
 
 class Event(BaseModel):
@@ -59,3 +59,19 @@ class ChatMessage(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     events_analyzed: int
+
+class AIRequest(BaseModel):
+    content: str = Field(..., description="De vraag of het verzoek aan de AI")
+
+class AIResponse(BaseModel):
+    response: str = Field(..., description="Het antwoord van de AI")
+    events_analyzed: int = Field(..., description="Aantal geanalyseerde events")
+
+class AIAnalysis(BaseModel):
+    analysis: str = Field(..., description="De analyse van de agenda")
+    events_analyzed: int = Field(..., description="Aantal geanalyseerde events")
+    period_days: int = Field(..., description="Aantal dagen geanalyseerd")
+
+class ErrorResponse(BaseModel):
+    detail: str = Field(..., description="Error message")
+    status: int = Field(..., description="HTTP status code")

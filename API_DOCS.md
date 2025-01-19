@@ -177,8 +177,38 @@ All endpoints include the following CORS headers:
 ### AI Assistant Endpoints
 POST /api/ai/chat
 - Chat met de AI over je agenda
-- Body: {"content": "string"}
+- Body: AIRequest
+  ```json
+  {
+    "content": "string"  // Je vraag
+  }
+  ```
+- Response: AIResponse
+  ```json
+  {
+    "response": "string",       // AI's antwoord
+    "events_analyzed": number   // Aantal bekeken events
+  }
+  ```
 
 POST /api/ai/analyze
-- Analyseer je agenda
-- Query params: days (optional, default=7)
+- Analyseer je agenda voor inzichten
+- Query params:
+  - days: number (optional, default=7)
+- Response: AIAnalysis
+  ```json
+  {
+    "analysis": "string",        // AI's analyse
+    "events_analyzed": number,   // Aantal events
+    "period_days": number       // Periode
+  }
+  ```
+
+### Error Responses
+- Status: 500
+  ```json
+  {
+    "detail": "string",  // Error beschrijving
+    "status": 500       // Status code
+  }
+  ```

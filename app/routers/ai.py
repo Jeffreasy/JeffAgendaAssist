@@ -4,7 +4,7 @@ import openai
 from datetime import datetime, timedelta
 
 from app.config import OPENAI_API_KEY, supabase, logger
-from app.schemas import ChatMessage, ChatResponse
+from app.schemas import ChatMessage, ChatResponse, AIRequest, AIResponse, AIAnalysis, ErrorResponse
 
 router = APIRouter()
 
@@ -25,8 +25,8 @@ async def get_relevant_events(days: int = 7):
         logger.error(f"Error fetching events for AI context: {str(e)}")
         return []
 
-@router.post("/chat")
-async def chat_with_assistant(message: ChatMessage):
+@router.post("/chat", response_model=AIResponse, responses={500: {"model": ErrorResponse}})
+async def chat_with_assistant(request: AIRequest):
     """Chat met de AI over je agenda"""
     try:
         # Haal relevante events op
@@ -44,20 +44,23 @@ async def chat_with_assistant(message: ChatMessage):
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": context},
-                {"role": "user", "content": message.content}
+                {"role": "user", "content": request.content}
             ]
         )
         
-        return ChatResponse(
+        return AIResponse(
             response=response.choices[0].message.content,
             events_analyzed=len(events)
         )
         
     except Exception as e:
         logger.error(f"AI chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500, 
+            detail={"detail": str(e), "status": 500}
+        )
 
-@router.post("/analyze")
+@router.post("/analyze", response_model=AIAnalysis, responses={500: {"model": ErrorResponse}})
 async def analyze_schedule(days: Optional[int] = 7):
     """Analyseer je agenda en geef inzichten"""
     try:
@@ -83,12 +86,15 @@ async def analyze_schedule(days: Optional[int] = 7):
             ]
         )
         
-        return {
-            "analysis": response.choices[0].message.content,
-            "events_analyzed": len(events),
-            "period_days": days
-        }
+        return AIAnalysis(
+            analysis=response.choices[0].message.content,
+            events_analyzed=len(events),
+            period_days=days
+        )
         
     except Exception as e:
         logger.error(f"AI analysis error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(
+            status_code=500, 
+            detail={"detail": str(e), "status": 500}
+        ) 
