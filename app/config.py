@@ -15,6 +15,11 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS')
 
+# Voeg toe aan environment variables
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
+CACHE_ENABLED = os.getenv('CACHE_ENABLED', 'true').lower() == 'true'
+CACHE_TTL = int(os.getenv('CACHE_TTL', '300'))  # 5 minuten default
+
 # Maak de Supabase-client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 

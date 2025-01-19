@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 from app.config import supabase, logger
 from app.schemas import Event, EventUpdate, SearchResult, EventCategory, EventLabel, UpdateLabelsRequest, EventWithLabels
+from app.services.cache_service import get_cached_data, set_cached_data
 
 router = APIRouter()
 
@@ -192,23 +193,35 @@ async def filter_events(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
 ):
-    """Filter events op category en labels"""
+    """Filter events op category en labels met caching"""
     try:
+        # Cache key maken
+        cache_key = f"filter:{category}:{labels}:{start_date}:{end_date}"
+        
+        # Check cache eerst
+        if cached_data := await get_cached_data(cache_key):
+            logger.info(f"Cache hit for {cache_key}")
+            return cached_data
+
+        # Als niet in cache, haal op uit database
         query = supabase.table('calendar_events').select('*')
 
-        if category and category in ["vroeg", "laat", "weekend"]:
+        if category:
             query = query.eq('category', category)
         if labels:
-            valid_labels = [l for l in labels if l in ["werk", "prive", "belangrijk"]]
-            if valid_labels:
-                query = query.contains('labels', valid_labels)
+            query = query.contains('labels', labels)
         if start_date:
             query = query.gte('start_time', start_date)
         if end_date:
             query = query.lte('end_time', end_date)
 
         result = query.execute()
-        return [EventWithLabels(**event) for event in result.data]
+        events = [EventWithLabels(**event) for event in result.data]
+
+        # Sla op in cache
+        await set_cached_data(cache_key, events)
+        
+        return events
 
     except Exception as e:
         logger.error(f"Error filtering events: {str(e)}")

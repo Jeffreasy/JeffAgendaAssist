@@ -2,8 +2,10 @@ from fastapi import FastAPI, HTTPException
 
 from app.config import logger, supabase, CREDENTIALS_FILE
 from app.routers import auth, events, notifications, stats
+from app.middleware.performance import performance_middleware
 
 app = FastAPI()
+app.middleware("http")(performance_middleware)
 
 @app.get("/")
 async def root():
