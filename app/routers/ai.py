@@ -8,8 +8,8 @@ from app.schemas import ChatMessage, ChatResponse, AIRequest, AIResponse, AIAnal
 
 router = APIRouter()
 
-# Initialize client
-client = OpenAI(api_key=OPENAI_API_KEY)
+# Initialize client without proxies
+client = OpenAI()  # API key will be read from environment
 
 async def get_relevant_events(days: int = 7):
     """Haal relevante events op voor context"""

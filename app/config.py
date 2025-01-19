@@ -66,5 +66,3 @@ else:
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 if not OPENAI_API_KEY:
     logger.warning("No OpenAI API key found")
-else:
-    openai.api_key = OPENAI_API_KEY
