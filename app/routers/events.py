@@ -3,6 +3,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import time
+from fastapi.responses import JSONResponse
 
 from app.config import supabase, logger
 from app.schemas import Event, EventUpdate, SearchResult, EventCategory, EventLabel, UpdateLabelsRequest, EventWithLabels
@@ -199,11 +200,20 @@ async def filter_events(
         start_time = time.time()
         cache_key = f"filter:{category}:{labels}:{start_date}:{end_date}"
         
+        # Headers voor response
+        headers = {"X-Cache-Status": "MISS", "X-Response-Time": "0"}
+        
         # Check cache eerst
         if cached_data := await get_cached_data(cache_key):
             process_time = (time.time() - start_time) * 1000
-            logger.info(f"Cache HIT - Time: {process_time:.2f}ms")
-            return cached_data
+            headers.update({
+                "X-Cache-Status": "HIT",
+                "X-Response-Time": f"{process_time:.2f}ms"
+            })
+            return JSONResponse(
+                content=cached_data,
+                headers=headers
+            )
 
         # Database query (cache miss)
         query = supabase.table('calendar_events').select('*')
@@ -224,8 +234,14 @@ async def filter_events(
         await set_cached_data(cache_key, events)
         
         process_time = (time.time() - start_time) * 1000
-        logger.info(f"Cache MISS - Time: {process_time:.2f}ms")
-        return events
+        headers.update({
+            "X-Response-Time": f"{process_time:.2f}ms"
+        })
+        
+        return JSONResponse(
+            content=events,
+            headers=headers
+        )
 
     except Exception as e:
         logger.error(f"Error filtering events: {str(e)}")
