@@ -41,6 +41,39 @@ GET /api/events/search?query=string&calendar_name=optional  # Zoek in events
 POST /api/notifications/setup    # Setup email notificaties
 GET /api/notifications/settings?email=user@example.com  # Haal notificatie instellingen op
 
+### 8. Event Categories & Labels
+GET /api/events/filter  # Filter events op categorie en labels
+
+Parameters:
+- category: "vroeg" | "laat" | "weekend"
+- labels: ["werk", "prive", "belangrijk"]
+- start_date: "YYYY-MM-DD" (optional)
+- end_date: "YYYY-MM-DD" (optional)
+
+### Event Categories
+- vroeg: 6:00-13:59 (werkdagen)
+- laat: 14:00-22:59 (werkdagen)
+- weekend: Alle events op zaterdag/zondag
+
+### Event Labels
+Events kunnen één of meerdere labels hebben:
+- werk
+- prive
+- belangrijk
+
+### Event Category Response Model
+{
+    "summary": "string",
+    "description": "string | null",
+    "start_time": "string (ISO datetime)",
+    "end_time": "string (ISO datetime)",
+    "location": "string | null",
+    "calendar_name": "string",
+    "is_recurring": "boolean",
+    "category": "vroeg" | "laat" | "weekend" | null,
+    "labels": ["werk" | "prive" | "belangrijk"]
+}
+
 ## Request & Response Models
 
 ### Event Response Model
@@ -91,9 +124,30 @@ Response:
     ]
 }
 
+### 1. Filter events op categorie
+curl "https://jeff-agenda-assist.vercel.app/api/events/filter?category=laat"
+
+### 2. Filter events op categorie en labels
+curl "https://jeff-agenda-assist.vercel.app/api/events/filter?category=vroeg&labels=werk"
+
+### 3. Update event labels
+curl -X POST https://jeff-agenda-assist.vercel.app/api/events/{event_id}/labels \
+  -H "Content-Type: application/json" \
+  -d '{
+    "category": "vroeg",
+    "labels": ["werk", "belangrijk"]
+  }'
+
 ## Error Responses
 Alle endpoints retourneren een 500 status code bij fouten met een detail message:
 
 {
     "detail": "Error message beschrijving"
 }
+
+### Performance Headers
+Alle responses bevatten de volgende headers:
+- `X-Cache-Status`: "HIT" of "MISS" (geeft aan of het resultaat uit cache kwam)
+- `X-Response-Time`: Tijd in milliseconden voor het verwerken van het request
+
+### Voorbeeld Response Headers
