@@ -19,7 +19,7 @@ httpx.USE_CLIENT_DEFAULT = True
 from app.main import app
 
 # Dit is nodig voor Vercel
-def handler(request: Request):
-    if request.url.path.endswith("/"):
-        return RedirectResponse(request.url.path[:-1])
-    return app 
+def app_handler(scope, receive, send):
+    return app(scope, receive, send)
+
+app = app_handler 
